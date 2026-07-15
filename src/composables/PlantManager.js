@@ -3,7 +3,11 @@ const currentPlant = ref(0)
 
 export function getPlantState() {
     function selectPlant(plant) {
-        currentPlant.value = plant
+        if (currentPlant.value == plant) {
+            currentPlant.value = ''
+        } else {
+            currentPlant.value = plant
+        }
     }
 
     return { currentPlant, selectPlant }

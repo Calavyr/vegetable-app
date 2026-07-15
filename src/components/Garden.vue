@@ -62,8 +62,11 @@ export default {
                     drawingBorder = true
                 }
                 if (drawingBorder) {
-                    this.addBorderPoint(e)
+                   this.addBorderPoint(e)
                 }
+            } else {
+                let x = e.evt.clientX
+                let y = e.evt.clientY
             }
         },
         handleMouseDown(e) {
@@ -76,11 +79,9 @@ export default {
                 let posVector = new Vector(x, y)
                 let newCrop = new Crop(currentPlant.value.id, posVector)
 
-                console.log('a')
                 if (!this.gardenBorder.isCropInPolygon(newCrop)) {
                     return
                 }
-                console.log('b')
 
                 addCrop(newCrop)
             }

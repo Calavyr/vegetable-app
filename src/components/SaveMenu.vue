@@ -104,28 +104,30 @@ export default {
         }
     },
     mounted() {
-        watch(journal.value, (newValue, oldValue) => {
+        watch(() => journal.value, (newValue, oldValue) => {
             try {
                 localStorage.setItem('journal', JSON.stringify(newValue))
             } catch (err) {
                 console.warn(err)
             }
-        })
-        watch(getCrops().value, (newValue, oldValue) => {
+        }, {deep: true})
+
+        watch(() => getCrops().value, (newValue, oldValue) => {
             try {
                 let simplifiedNewValue = newValue.map((v, i) => ({id: v.id, pos: v.pos}))
                 localStorage.setItem('crops', JSON.stringify(simplifiedNewValue))
             } catch (err) {
                 console.warn(err)
             }
-        })
-        watch(getPoints().value, (newValue, oldValue) => {
+        }, {deep: true})
+
+        watch(() => getPoints().value, (newValue, oldValue) => {
             try {
                 localStorage.setItem('points', JSON.stringify(newValue))
             } catch (err) {
                 console.warn(err)
             }
-        })
+        }, {deep: true})
         this.updateOthers()
     }
 }
