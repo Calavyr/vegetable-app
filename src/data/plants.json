@@ -1,0 +1,86 @@
+[
+    {
+        "id": 1,
+        "plant": "Broccoli",
+        "colour": "Green",
+        "image": "https://cdn-icons-png.flaticon.com/512/2909/2909841.png",
+        "minArea": 45
+    },
+    {
+        "id": 2,
+        "plant": "Carrot",
+        "colour": "OrangeRed",
+        "image": "https://cdn-icons-png.flaticon.com/512/2909/2909782.png",
+        "minArea": 5
+    },
+    {
+        "id": 3,
+        "plant": "Eggplant",
+        "colour": "Indigo",
+        "image": "https://cdn-icons-png.flaticon.com/512/2909/2909877.png",
+        "minArea":45
+    },
+    {
+        "id": 4,
+        "plant": "Tomato",
+        "colour": "Red",
+        "image": "https://cdn-icons-png.flaticon.com/512/2909/2909922.png",
+        "minArea": 90
+    },
+    {
+        "id": 5,
+        "plant": "Pumpkin",
+        "colour": "DarkOrange",
+        "image": "https://cdn-icons-png.flaticon.com/512/2909/2909916.png",
+        "minArea": 150
+    },
+    {
+        "id": 6,
+        "plant": "Radish",
+        "colour": "Crimson",
+        "image": "https://cdn-icons-png.flaticon.com/512/2909/2909778.png",
+        "minArea": 5
+    },
+    {
+        "id": 7,
+        "plant": "Corn",
+        "colour": "Gold",
+        "image": "https://cdn-icons-png.flaticon.com/512/4778/4778606.png",
+        "minArea": 25
+    },
+    {
+        "id": 8,
+        "plant": "Cauliflower",
+        "colour": "FloralWhite",
+        "image": "https://cdn-icons-png.flaticon.com/512/2909/2909861.png",
+        "minArea": 45
+    },
+    {
+        "id": 9,
+        "plant": "Garlic",
+        "colour": "Bisque",
+        "image": "https://cdn-icons-png.flaticon.com/512/2909/2909878.png",
+        "minArea":10
+    },
+    {
+        "id": 10,
+        "plant": "Capsicum",
+        "colour": "ForestGreen",
+        "image": "https://cdn-icons-png.flaticon.com/512/2909/2909814.png",
+        "minArea": 45
+    },
+    {
+        "id": 11,
+        "plant": "Beetroot",
+        "colour": "Maroon",
+        "image": "https://cdn-icons-png.flaticon.com/512/3480/3480532.png",
+        "minArea":7.5
+    },
+    {
+        "id": 12,
+        "plant": "Potato",
+        "colour":"BurlyWood",
+        "image": "https://cdn-icons-png.flaticon.com/512/3480/3480699.png",
+        "minArea":35
+    }
+]
