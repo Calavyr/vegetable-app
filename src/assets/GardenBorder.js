@@ -1,9 +1,10 @@
 import { Vector } from "./Vector"
 import { Crop } from "./Crop"
+import { ref } from "vue"
 
 export class GardenBorder {
-    constructor(points) {
-        this.points = points || []
+    constructor(pointsRef) {
+        this.points = pointsRef || ref([])
     }
 
     isPointInPolygon(point) {

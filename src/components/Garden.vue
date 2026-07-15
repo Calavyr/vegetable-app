@@ -16,8 +16,10 @@
 import { Crop } from '@/assets/Crop';
 import { GardenBorder } from '@/assets/GardenBorder';
 import { Vector } from '@/assets/Vector';
+import { getGardenState } from '@/composables/GardenManager';
 import { getPlantState } from '@/composables/PlantManager';
 const { currentPlant, selectPlant } = getPlantState()
+const { addCrop, removeCrop, getCrops, addPoint, removePoint, getPoints } = getGardenState()
 
 let isMouseDown = false
 let drawingBorder = false
@@ -31,8 +33,7 @@ export default {
     },
     data() {
         return {
-            gardenBorder: new GardenBorder(),
-            crops: [],
+            gardenBorder: new GardenBorder(getPoints()),
             konvaConfig: {
                 width: window.innerWidth,
                 height: window.innerHeight
@@ -42,13 +43,18 @@ export default {
                 closed: true,
                 stroke: '#000000',
                 fill: '#32a852'
-            }
+            },
+            crops: getCrops()
         }
     },
     methods: {
-        addBorderPoint(e) {
-            this.gardenBorder.points.push(new Vector(e.evt.clientX, e.evt.clientY))
+        updateGarden() {
             this.borderConfig.points = this.gardenBorder.getPoints()
+        },
+        addBorderPoint(e) {
+            let newPoint = new Vector(e.evt.clientX, e.evt.clientY)
+            addPoint(newPoint)
+            this.borderConfig.points = this.gardenBorder.getPoints()            
         },
         handleMouseMove(e) {
             if (isMouseDown) {
@@ -70,11 +76,13 @@ export default {
                 let posVector = new Vector(x, y)
                 let newCrop = new Crop(currentPlant.value.id, posVector)
 
+                console.log('a')
                 if (!this.gardenBorder.isCropInPolygon(newCrop)) {
                     return
                 }
+                console.log('b')
 
-                this.crops.push(newCrop)
+                addCrop(newCrop)
             }
         },
         handleMouseUp(e) {

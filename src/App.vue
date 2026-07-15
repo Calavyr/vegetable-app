@@ -1,5 +1,5 @@
 <template>
-	<Garden></Garden>
+	<Garden ref="garden"></Garden>
 	<SidebarMenu></SidebarMenu>
 	
 	<PlantMenu v-show="currentMenu === 'plant'"></PlantMenu>
@@ -40,6 +40,7 @@ export default {
 	methods: {
 		updateChildren() {
 			this.$refs.journal.updateDate()
+			this.$refs.garden.updateGarden()
 		}
 	}
 }

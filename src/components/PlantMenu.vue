@@ -3,7 +3,7 @@
         <div id="tableWrapper">
             <table>
                 <tr v-for="(chunk, chunkIndex) in chunkedPlants">
-                    <td v-for="(plant, plantIndex) in chunk" @click="selectPlant(plant)">
+                    <td v-for="(plant, plantIndex) in chunk" @click="selectPlant(plant)" :class="{ 'selected': (currentPlant == plant) }">
                         <p>{{ plant.plant }}</p>
                         <img :src="plant.image" width="50px">
                     </td>
@@ -22,7 +22,8 @@ export default {
     data() {
         return {
             plants: plantsData,
-            chunkedPlants: []
+            chunkedPlants: [],
+            currentPlant
         }
     },
     mounted() {
@@ -68,5 +69,9 @@ td {
     border-radius: 1vw;
     text-align: center;
     background: white;
+}
+
+td.selected {
+    background: lightgrey;
 }
 </style>
