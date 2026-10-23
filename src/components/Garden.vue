@@ -23,6 +23,8 @@
         </v-layer>
         <v-layer :config="{ listening: false }">
             <v-text :config="{ x: 16, y: 16, text: Math.round(cameraConfig.scaleX * 100) + '%  -  Scroll to zoom  -  Middle-mouse-drag to pan (scroll-wheel)', fontSize: 14, fill: '#222222' }"></v-text>
+            <v-text :config="getScaleLabelConfig()"></v-text>
+            <v-line :config="getScaleLineConfig()"></v-line>
         </v-layer>
     </v-stage>
 </template>
@@ -124,6 +126,34 @@ export default {
                 (e.evt.clientX - this.cameraConfig.x) / this.cameraConfig.scaleX,
                 (e.evt.clientY - this.cameraConfig.y) / this.cameraConfig.scaleY
             )
+        },
+        getScaleDistance() {
+            let targetDistance = 100 / this.cameraConfig.scaleX
+            let power = Math.pow(10, Math.floor(Math.log10(targetDistance)))
+            let candidates = [1, 2, 5, 10].map((value) => value * power)
+            return candidates.reduce((closest, value) => Math.abs(value - targetDistance) < Math.abs(closest - targetDistance) ? value : closest)
+        },
+        getScaleLabelConfig() {
+            let distance = this.getScaleDistance()
+            let label = distance >= 100 ? `${distance / 100} m` : `${distance} cm`
+            return {
+                x: 20,
+                y: this.konvaConfig.height - 54,
+                text: `Estimated scale · ${label}`,
+                fontSize: 14,
+                fill: '#222222'
+            }
+        },
+        getScaleLineConfig() {
+            let distance = this.getScaleDistance()
+            let width = distance * this.cameraConfig.scaleX
+            let x = 20
+            let y = this.konvaConfig.height - 28
+            return {
+                points: [x, y - 5, x, y, x + width, y, x + width, y - 5],
+                stroke: '#222222',
+                strokeWidth: 2
+            }
         },
         handleWheel(e) {
             e.evt.preventDefault()
