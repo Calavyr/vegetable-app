@@ -1,4 +1,5 @@
 <template>
+    <div class="gardenView">
     <v-stage
     :config='konvaConfig'
     @mousemove='handleMouseMove'
@@ -8,7 +9,7 @@
     @mouseleave='handleMouseUp'>
         <v-layer :config="cameraConfig">
             <v-line :config='borderConfig'></v-line>
-            <v-text v-if="layoutConfig" :config="{x: 16, y: 16, text: 'Draw on the garden, then reopen Plant to apply or cancel the preview.', fontSize: 16, fill: '#111111', listening: false}"></v-text>
+            <v-text v-if="layoutConfig" :config="{x: 16, y: 42, text: 'Drag on the garden to preview placements.', fontSize: 16, fill: '#111111', listening: false}"></v-text>
             <v-image v-for="crop in crops" :key="crop" :config="getCropImageConfig(crop)"></v-image>
             <template v-if="showCropHitboxes">
                 <v-circle v-for="crop in crops" :key="crop.id + crop.pos.x + crop.pos.y" :config="getCropCircleConfig(crop)"></v-circle>
@@ -27,6 +28,34 @@
             <v-line :config="getScaleLineConfig()"></v-line>
         </v-layer>
     </v-stage>
+    <div class="layoutPanel">
+        <strong>Crop layout</strong>
+        <span>Using: {{ currentPlant && currentPlant.plant ? currentPlant.plant : 'Select a crop in Plant Menu' }}</span>
+        <label>Spacing (cm) <input v-model.number="layoutSpacing" type="number" min="1" max="500"></label>
+        <label>Layout
+            <select v-model="layoutType">
+                <option value="row">Rows</option>
+                <option value="patch">Patch</option>
+            </select>
+        </label>
+        <template v-if="layoutType === 'row'">
+            <label>Rows <input v-model.number="layoutRows" type="number" min="1" max="20"></label>
+            <label>Row gap (cm) <input v-model.number="rowGap" type="number" min="1" max="500"></label>
+        </template>
+        <label v-else>Patch pattern
+            <select v-model="patchPattern">
+                <option value="rows">Regular rows</option>
+                <option value="tight">Staggered tight pack</option>
+            </select>
+        </label>
+        <div class="layoutButtons">
+            <button @click="beginLayout">Draw layout</button>
+            <button @click="applyLayout" :disabled="layoutPreview.length === 0">Apply preview</button>
+            <button @click="cancelLayout">Cancel</button>
+        </div>
+        <small v-if="layoutMessage">{{ layoutMessage }}</small>
+    </div>
+    </div>
 </template>
 
 <script>
@@ -70,6 +99,7 @@ export default {
                 fill: '#32a852'
             },
             crops: getCrops(),
+            currentPlant,
             selectedCrop: null,
             boundaryPoints: getPoints(),
             showCropHitboxes,
@@ -80,6 +110,12 @@ export default {
             layoutConfig: null,
             layoutStart: null,
             layoutEnd: null,
+            layoutSpacing: 50,
+            layoutType: 'row',
+            layoutRows: 1,
+            rowGap: 60,
+            patchPattern: 'tight',
+            layoutMessage: '',
             selectedCrops: [],
             gestureMode: null,
             gestureStart: null,
@@ -100,17 +136,34 @@ export default {
         updateGarden() {
             this.borderConfig.points = this.gardenBorder.getPoints()
         },
-        beginLayout(config) {
-            this.layoutConfig = config
+        beginLayout() {
+            if (!currentPlant.value?.id) {
+                this.layoutMessage = 'Select a crop in the Plant menu first.'
+                return
+            }
+            if (getPoints().value.length < 3) {
+                this.layoutMessage = 'Draw a garden boundary first.'
+                return
+            }
+            this.layoutConfig = {
+                plantId: currentPlant.value.id,
+                spacing: this.layoutSpacing,
+                type: this.layoutType,
+                rows: this.layoutRows,
+                rowGap: this.rowGap,
+                patchPattern: this.patchPattern
+            }
             this.layoutStart = null
             this.layoutEnd = null
             this.layoutPreview = []
+            this.layoutMessage = 'Drag on the garden to draw the layout.'
         },
         cancelLayout() {
             this.layoutConfig = null
             this.layoutStart = null
             this.layoutEnd = null
             this.layoutPreview = []
+            this.layoutMessage = ''
         },
         applyLayout() {
             if (!this.layoutConfig || this.layoutPreview.length == 0) return 'Draw a layout preview first.'
@@ -120,6 +173,7 @@ export default {
             for (let position of positions) addCrop(new Crop(plant.id, position))
             let count = positions.length
             this.cancelLayout()
+            this.layoutMessage = `Placed ${count} crops.`
             return `Placed ${count} crops.`
         },
         getLayoutPreviewConfig(point) {
@@ -146,7 +200,7 @@ export default {
             return {
                 x: 20 + this.scaleOffset.x,
                 y: this.konvaConfig.height - 54 + this.scaleOffset.y,
-                text: `Estimated scale · ${label}`,
+                text: `Estimated scale - ${label} - Draggable`,
                 fontSize: 14,
                 fill: '#222222',
                 name: 'scale-ruler'
@@ -420,7 +474,7 @@ export default {
                 this.layoutEnd = this.getGardenPoint(e)
                 this.updateLayoutPreview()
                 this.layoutStart = null
-                this.$emit('layoutPreviewReady', this.layoutPreview.length)
+                this.layoutMessage = this.layoutPreview.length > 0 ? `Previewing ${this.layoutPreview.length} placements.` : 'No valid placements in that area.'
                 isMouseDown = false
                 return
             }
@@ -597,4 +651,41 @@ export default {
 </script>
 
 <style scoped>
+.gardenView {
+    position: fixed;
+    inset: 0;
+}
+.layoutPanel {
+    position: absolute;
+    z-index: 10;
+    left: 16px;
+    bottom: 70px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 230px;
+    max-height: 45vh;
+    overflow-y: auto;
+    padding: 10px;
+    border: 1px solid #555;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.95);
+}
+.layoutPanel label {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+.layoutPanel input,
+.layoutPanel select {
+    width: 90px;
+}
+.layoutButtons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.layoutButtons button {
+    flex: 1;
+}
 </style>

@@ -11,41 +11,6 @@
                     <button v-if="String(plant.id).startsWith('custom-')" class="removePlant" @click="removePlant(plant)">Remove</button>
                 </div>
             </div>
-            <div class="arrangeControls">
-                <strong>Place a crop layout</strong>
-                <label>Crop
-                    <select v-model="layoutPlantId">
-                        <option v-for="plant in plants" :key="plant.id" :value="plant.id">{{ plant.plant }}</option>
-                    </select>
-                </label>
-                <label>Plant spacing (cm)
-                    <input v-model.number="layoutSpacing" type="number" min="1" max="500" step="1">
-                </label>
-                <label>Layout
-                    <select v-model="layoutType">
-                        <option value="row">Rows</option>
-                        <option value="patch">Patch</option>
-                    </select>
-                </label>
-                <template v-if="layoutType === 'row'">
-                    <label>Number of rows
-                        <input v-model.number="layoutRows" type="number" min="1" max="20" step="1">
-                    </label>
-                    <label>Gap between rows (cm)
-                        <input v-model.number="rowGap" type="number" min="1" max="500" step="1">
-                    </label>
-                </template>
-                <label v-else>Patch pattern
-                    <select v-model="patchPattern">
-                        <option value="rows">Regular rows</option>
-                        <option value="tight">Staggered tight pack</option>
-                    </select>
-                </label>
-                <button type="button" @click="startLayout">Draw layout</button>
-                <button type="button" @click="$emit('applyLayout')" :disabled="!layoutPreviewReady">Apply preview</button>
-                <button type="button" @click="$emit('cancelLayout')">Cancel</button>
-                <small v-if="arrangementMessage">{{ arrangementMessage }}</small>
-            </div>
             <form @submit.prevent="importCrop">
                 <input v-model="customPlantName" placeholder="Crop name" maxlength="40" required>
                 <label>Growing space radius (cm)
@@ -73,35 +38,11 @@ export default {
             customPlantName: '',
             customPlantRadius: 23,
             customPlantImage: '',
-            importError: '',
-            arrangementMessage: '',
-            layoutPlantId: getPlants().value[0]?.id ?? '',
-            layoutSpacing: 50,
-            layoutType: 'row',
-            layoutRows: 1,
-            rowGap: 60,
-            patchPattern: 'tight',
-            layoutPreviewReady: false
+            importError: ''
         }
     },
     methods: {
         selectPlant,
-        startLayout() {
-            const plant = this.plants.find((item) => item.id === this.layoutPlantId)
-            if (!plant) {
-                this.arrangementMessage = 'Import or choose a crop first.'
-                return
-            }
-            this.layoutPreviewReady = false
-            this.$emit('startLayoutTool', {
-                plantId: plant.id,
-                spacing: this.layoutSpacing,
-                type: this.layoutType,
-                rows: this.layoutRows,
-                rowGap: this.rowGap,
-                patchPattern: this.patchPattern
-            })
-        },
         getPlantRadius(plant) {
             return plant.spacingRadius ?? plant.minArea / 2
         },
@@ -230,16 +171,6 @@ form {
     gap: 8px;
     align-items: center;
     margin-top: 12px;
-}
-.arrangeControls {
-    display: flex;
-    flex: 0 0 auto;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-}
-.arrangeControls small {
-    flex-basis: 100%;
 }
 form label {
     white-space: nowrap;

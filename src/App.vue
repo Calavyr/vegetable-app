@@ -1,8 +1,8 @@
 <template>
-	<Garden ref="garden" @layoutPreviewReady="layoutPreviewReady"></Garden>
+	<Garden ref="garden"></Garden>
 	<SidebarMenu></SidebarMenu>
 	
-	<PlantMenu ref="plantMenu" v-show="currentMenu === 'plant'" @startLayoutTool="startLayoutTool" @applyLayout="applyLayout" @cancelLayout="cancelLayout"></PlantMenu>
+	<PlantMenu v-show="currentMenu === 'plant'"></PlantMenu>
 	<JournalMenu v-show="currentMenu === 'journal'" ref="journal"></JournalMenu>
 	<WeatherMenu v-show="currentMenu === 'weather'"></WeatherMenu>
 	<SaveMenu v-show="currentMenu === 'save'" @saveLoaded="updateChildren()"></SaveMenu>
@@ -38,25 +38,6 @@ export default {
 		}
 	},
 	methods: {
-		startLayoutTool(config) {
-			this.$refs.plantMenu.layoutPreviewReady = false
-			this.$refs.plantMenu.arrangementMessage = 'Drag a line or patch on the garden to preview placements.'
-			this.$refs.garden.beginLayout(config)
-			currentMenu.value = ''
-		},
-		layoutPreviewReady(count) {
-			this.$refs.plantMenu.layoutPreviewReady = count > 0
-			this.$refs.plantMenu.arrangementMessage = count > 0 ? `Previewing ${count} placements.` : 'No valid placements in that area.'
-		},
-		applyLayout() {
-			this.$refs.plantMenu.arrangementMessage = this.$refs.garden.applyLayout()
-			this.$refs.plantMenu.layoutPreviewReady = false
-		},
-		cancelLayout() {
-			this.$refs.garden.cancelLayout()
-			this.$refs.plantMenu.layoutPreviewReady = false
-			this.$refs.plantMenu.arrangementMessage = ''
-		},
 		updateChildren() {
 			this.$refs.journal.updateDate()
 			this.$refs.garden.updateGarden()
