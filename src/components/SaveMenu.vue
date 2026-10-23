@@ -1,8 +1,8 @@
 <template>
-    <div>
-        <button @click="exportSaveData('save.txt')">Save</button><br>
-        <input type="file" @change="handleFileChange">
-        <button @click="loadSaveData()" v-if="file">Load</button>
+    <div class="menu">
+        <button class="saveControl" @click="exportSaveData('save.txt')">Save</button>
+        <input class="saveControl" type="file" accept=".txt,application/json" @change="handleFileChange">
+        <button class="saveControl" @click="loadSaveData()" v-if="file">Load</button>
     </div>
 </template>
 
@@ -138,7 +138,7 @@ export default {
 </script>
 
 <style scoped>
-div {
+.menu {
     position: absolute;
     top: 10%;
     left: 20%;
@@ -146,5 +146,13 @@ div {
     height: 80%;
     border: black 2px solid;
     background-color: white;
+    box-sizing: border-box;
+    padding: 12px;
+}
+.saveControl {
+    display: block;
+    max-width: 100%;
+    margin: 0 0 10px;
+    padding: 6px;
 }
 </style>
