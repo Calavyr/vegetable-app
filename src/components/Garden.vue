@@ -4,8 +4,9 @@
     @mousemove='handleMouseMove'
     @mousedown='handleMouseDown'
     @mouseup='handleMouseUp'
+    @wheel='handleWheel'
     @mouseleave='handleMouseUp'>
-        <v-layer>
+        <v-layer :config="cameraConfig">
             <v-line :config='borderConfig'></v-line>
             <v-text v-if="layoutConfig" :config="{x: 16, y: 16, text: 'Draw on the garden, then reopen Plant to apply or cancel the preview.', fontSize: 16, fill: '#111111', listening: false}"></v-text>
             <v-image v-for="crop in crops" :key="crop" :config="{x: crop.pos.x - crop.image.width / 2, y: crop.pos.y - crop.image.height / 2, image: crop.image}"></v-image>
@@ -19,6 +20,9 @@
             <v-circle v-for="(point, index) in layoutPreview" :key="'layout-preview-' + index" :config="getLayoutPreviewConfig(point)"></v-circle>
             <v-rect v-if="gestureMode && selectionShape === 'box' && gestureMoved" :config="getGestureBoxConfig()"></v-rect>
             <v-line v-if="gestureMode && selectionShape === 'lasso' && gestureMoved" :config="getGestureLassoConfig()"></v-line>
+        </v-layer>
+        <v-layer :config="{ listening: false }">
+            <v-text :config="{ x: 16, y: 16, text: Math.round(cameraConfig.scaleX * 100) + '%  -  Scroll to zoom  -  Middle-mouse-drag to pan (scroll-wheel)', fontSize: 14, fill: '#222222' }"></v-text>
         </v-layer>
     </v-stage>
 </template>
@@ -56,6 +60,7 @@ export default {
                 width: window.innerWidth,
                 height: window.innerHeight
             },
+            cameraConfig: { x: 0, y: 0, scaleX: 1, scaleY: 1 },
             borderConfig: {
                 points: [],
                 closed: true,
@@ -79,7 +84,10 @@ export default {
             gesturePoints: [],
             gestureMoved: false,
             groupDragStart: null,
-            groupStartPositions: []
+            groupStartPositions: [],
+            isPanning: false,
+            panStart: null,
+            panOrigin: null
         }
     },
     methods: {
@@ -110,6 +118,25 @@ export default {
         },
         getLayoutPreviewConfig(point) {
             return { x: point.x, y: point.y, radius: 5, fill: '#1687ff', opacity: 0.65, listening: false }
+        },
+        getGardenPoint(e) {
+            return new Vector(
+                (e.evt.clientX - this.cameraConfig.x) / this.cameraConfig.scaleX,
+                (e.evt.clientY - this.cameraConfig.y) / this.cameraConfig.scaleY
+            )
+        },
+        handleWheel(e) {
+            e.evt.preventDefault()
+            let oldScale = this.cameraConfig.scaleX
+            let newScale = Math.max(0.25, Math.min(4, oldScale * (e.evt.deltaY < 0 ? 1.1 : 1 / 1.1)))
+            let pointerX = e.evt.clientX
+            let pointerY = e.evt.clientY
+            let gardenX = (pointerX - this.cameraConfig.x) / oldScale
+            let gardenY = (pointerY - this.cameraConfig.y) / oldScale
+            this.cameraConfig.scaleX = newScale
+            this.cameraConfig.scaleY = newScale
+            this.cameraConfig.x = pointerX - gardenX * newScale
+            this.cameraConfig.y = pointerY - gardenY * newScale
         },
         getLayoutPointIsAvailable(point, radius, previewPoints) {
             let corners = [
@@ -168,7 +195,7 @@ export default {
             this.layoutPreview = candidates
         },
         addBorderPoint(e) {
-            let newPoint = new Vector(e.evt.clientX, e.evt.clientY)
+            let newPoint = this.getGardenPoint(e)
             addPoint(newPoint) // Add point using GardenManager
             this.borderConfig.points = this.gardenBorder.getPoints() // Updates rendered polygon
         },
@@ -204,14 +231,20 @@ export default {
             }
         },
         handleMouseMove(e) {
+            if (this.isPanning) {
+                this.cameraConfig.x = this.panOrigin.x + e.evt.clientX - this.panStart.x
+                this.cameraConfig.y = this.panOrigin.y + e.evt.clientY - this.panStart.y
+                return
+            }
             if (isMouseDown) {
+                let gardenPoint = this.getGardenPoint(e)
                 if (this.layoutConfig && this.layoutStart) {
-                    this.layoutEnd = new Vector(e.evt.clientX, e.evt.clientY)
+                    this.layoutEnd = gardenPoint
                     this.updateLayoutPreview()
                     return
                 }
                 if (this.gestureMode) {
-                    this.gestureEnd = new Vector(e.evt.clientX, e.evt.clientY)
+                    this.gestureEnd = gardenPoint
                     if (this.gestureStart.sub(this.gestureEnd).magnitudeSquared() > 36) this.gestureMoved = true
                     if (this.selectionShape === 'lasso') {
                         let lastPoint = this.gesturePoints[this.gesturePoints.length - 1]
@@ -225,10 +258,10 @@ export default {
                 if (drawingBorder) {
                    this.addBorderPoint(e)
                 } else if (draggingBorderPoint !== null) {
-                    getPoints().value[draggingBorderPoint] = new Vector(e.evt.clientX, e.evt.clientY)
+                    getPoints().value[draggingBorderPoint] = gardenPoint
                     this.borderConfig.points = this.gardenBorder.getPoints()
                 } else if (draggingCrop && this.selectedCrop) {
-                    let delta = new Vector(e.evt.clientX, e.evt.clientY).sub(this.groupDragStart)
+                    let delta = gardenPoint.sub(this.groupDragStart)
                     let selected = this.selectedCrops
                     let proposed = this.groupStartPositions.map((position) => position.add(delta))
                     let valid = selected.every((crop, index) => this.isCropPositionValid(crop, proposed[index], selected))
@@ -242,9 +275,17 @@ export default {
             }
         },
         handleMouseDown(e) {
+            if (e.evt.button == 1) {
+                e.evt.preventDefault()
+                this.isPanning = true
+                this.panStart = new Vector(e.evt.clientX, e.evt.clientY)
+                this.panOrigin = new Vector(this.cameraConfig.x, this.cameraConfig.y)
+                return
+            }
             isMouseDown = true
+            let gardenPoint = this.getGardenPoint(e)
             if (this.layoutConfig && getPoints().value.length >= 3 && e.evt.button == 0) {
-                this.layoutStart = new Vector(e.evt.clientX, e.evt.clientY)
+                this.layoutStart = gardenPoint
                 this.layoutEnd = this.layoutStart
                 this.layoutPreview = []
                 return
@@ -253,7 +294,7 @@ export default {
                 return
             }
 
-            let point = new Vector(e.evt.clientX, e.evt.clientY)
+            let point = gardenPoint
             let points = getPoints().value
             let closestBorderPoint = this.getClosestBorderPoint(point)
 
@@ -303,8 +344,13 @@ export default {
             }
         },
         handleMouseUp(e) {
+            if (this.isPanning) {
+                this.isPanning = false
+                isMouseDown = false
+                return
+            }
             if (this.layoutConfig && this.layoutStart) {
-                this.layoutEnd = new Vector(e.evt.clientX, e.evt.clientY)
+                this.layoutEnd = this.getGardenPoint(e)
                 this.updateLayoutPreview()
                 this.layoutStart = null
                 this.$emit('layoutPreviewReady', this.layoutPreview.length)
@@ -312,7 +358,7 @@ export default {
                 return
             }
             if (this.gestureMode) {
-                let endPoint = new Vector(e.evt.clientX, e.evt.clientY)
+                let endPoint = this.getGardenPoint(e)
                 this.gestureEnd = endPoint
                 if (this.gestureMoved) {
                     if (this.selectionShape === 'lasso') this.gesturePoints.push(endPoint)
