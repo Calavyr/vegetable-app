@@ -240,12 +240,18 @@ export default {
             ]
             if (!corners.every((corner) => this.gardenBorder.isPointInPolygon(corner))) return false
             for (let crop of this.crops) {
-                if (crop.pos.sub(point).magnitudeSquared() < (crop.spacingRadius * this.getPixelScale() + radius) ** 2) return false
+                let minDistance = crop.spacingRadius * this.getPixelScale() + radius
+                if (this.isCloserThanSpacing(crop.pos.sub(point).magnitudeSquared(), minDistance)) return false
             }
             for (let placedPoint of previewPoints) {
-                if (placedPoint.sub(point).magnitudeSquared() < (radius * 2) ** 2) return false
+                if (this.isCloserThanSpacing(placedPoint.sub(point).magnitudeSquared(), radius * 2)) return false
             }
             return true
+        },
+        isCloserThanSpacing(distanceSquared, minDistance) {
+            let minDistanceSquared = minDistance ** 2
+            let tolerance = Math.max(1, minDistanceSquared) * 1e-10
+            return distanceSquared < minDistanceSquared - tolerance
         },
         updateLayoutPreview() {
             if (!this.layoutConfig || !this.layoutStart || !this.layoutEnd) return
@@ -576,7 +582,8 @@ export default {
             if (!corners.every((corner) => this.gardenBorder.isPointInPolygon(corner))) return false
             for (let other of this.crops) {
                 if (selectedCrops.includes(other)) continue
-                if (other.pos.sub(position).magnitudeSquared() < ((other.spacingRadius + crop.spacingRadius) * this.getPixelScale()) ** 2) return false
+                let minDistance = (other.spacingRadius + crop.spacingRadius) * this.getPixelScale()
+                if (this.isCloserThanSpacing(other.pos.sub(position).magnitudeSquared(), minDistance)) return false
             }
             return true
         },
@@ -634,7 +641,7 @@ export default {
 
                 let difference = existingCrop.pos.sub(crop.pos)
                 let minDistance = (existingCrop.spacingRadius + crop.spacingRadius) * this.getPixelScale()
-                if (difference.magnitudeSquared() < minDistance * minDistance) {
+                if (this.isCloserThanSpacing(difference.magnitudeSquared(), minDistance)) {
                     return true
                 }
             }
