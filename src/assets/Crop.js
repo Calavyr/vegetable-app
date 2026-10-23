@@ -1,14 +1,15 @@
-import data from '@/data/plants.json'
 import { useImage } from 'vue-konva'
 import { Vector } from "./Vector"
+import { getPlantState } from '@/composables/PlantManager'
 
 export class Crop {
     constructor(id, point) {
         this.id = id
-        let matchingData = data.find((obj) => obj.id === id)
+        let matchingData = getPlantState().getPlants().value.find((obj) => obj.id === id)
         this.plant = matchingData.plant
         this.colour = matchingData.colour
         this.minArea = matchingData.minArea
+        this.spacingRadius = matchingData.spacingRadius ?? matchingData.minArea / 2
         this.imageUrl = matchingData.image
         this.image = new Image()
         this.image.src = this.imageUrl

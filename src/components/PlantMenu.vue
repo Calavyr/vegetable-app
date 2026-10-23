@@ -1,39 +1,82 @@
 <template>
     <div>
         <div id="tableWrapper">
-            <table>
-                <tr v-for="(chunk, chunkIndex) in chunkedPlants">
-                    <td v-for="(plant, plantIndex) in chunk" @click="selectPlant(plant)" :class="{ 'selected': (currentPlant == plant) }">
-                        <p>{{ plant.plant }}</p>
-                        <img :src="plant.image" width="50px">
-                    </td>
-                </tr>
-            </table>
+            <div class="plantGrid">
+                <button v-for="plant in plants" :key="plant.id" @click="selectPlant(plant)" :class="{ 'selected': currentPlant === plant }">
+                    <span>{{ plant.plant }}</span>
+                    <img :src="plant.image" width="50">
+                </button>
+            </div>
+            <form @submit.prevent="importCrop">
+                <input v-model="customPlantName" placeholder="Crop name" maxlength="40" required>
+                <label>Growing space radius (cm)
+                    <input v-model.number="customPlantRadius" type="number" min="1" max="500" step="1" required>
+                </label>
+                <input type="file" accept="image/*" @change="handleImageChange" required>
+                <button type="submit">Import crop</button>
+                <p v-if="importError">{{ importError }}</p>
+            </form>
         </div>
     </div>
 </template>
 
 <script>
-import plantsData from '@/data/plants.json'
 import { getPlantState } from '@/composables/PlantManager';
-const { currentPlant, selectPlant } = getPlantState()
+const { currentPlant, selectPlant, addCustomPlant, getPlants } = getPlantState()
 
 export default {
     data() {
         return {
-            plants: plantsData,
-            chunkedPlants: [],
-            currentPlant
-        }
-    },
-    mounted() {
-        const columns = 5;
-        for (let i = 0; i < this.plants.length; i += columns) {
-            this.chunkedPlants.push(this.plants.slice(i, i + columns))
+            plants: getPlants(),
+            currentPlant,
+            customPlantName: '',
+            customPlantRadius: 23,
+            customPlantImage: '',
+            importError: ''
         }
     },
     methods: {
-        selectPlant
+        selectPlant,
+        handleImageChange(event) {
+            const file = event.target.files[0]
+            this.importError = ''
+            if (!file) return
+            if (!file.type.startsWith('image/')) {
+                this.importError = 'Choose an image file.'
+                return
+            }
+            if (file.size > 2 * 1024 * 1024) {
+                this.importError = 'Choose an image smaller than 2 MB.'
+                return
+            }
+            const reader = new FileReader()
+            reader.onload = () => { this.customPlantImage = reader.result }
+            reader.readAsDataURL(file)
+        },
+        importCrop() {
+            if (!this.customPlantImage) {
+                this.importError = 'Choose an image file.'
+                return
+            }
+            const plant = {
+                id: `custom-${Date.now()}`,
+                plant: this.customPlantName.trim(),
+                colour: 'Green',
+                image: this.customPlantImage,
+                minArea: 45,
+                spacingRadius: this.customPlantRadius
+            }
+            try {
+                addCustomPlant(plant)
+                this.selectPlant(plant)
+                this.customPlantName = ''
+                this.customPlantRadius = 23
+                this.customPlantImage = ''
+                this.importError = ''
+            } catch (error) {
+                this.importError = 'Could not save this crop. Try a smaller image.'
+            }
+        }
     }
 }
 
@@ -62,6 +105,36 @@ div#tableWrapper {
 table {
     width: 100%;
     height: 100%;
+}
+.plantGrid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+}
+.plantGrid button {
+    min-height: 90px;
+    border: black 2px solid;
+    border-radius: 1vw;
+    background: white;
+}
+.plantGrid button.selected {
+    background: lightgrey;
+}
+.plantGrid img {
+    display: block;
+    margin: 4px auto;
+    object-fit: contain;
+}
+form {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 12px;
+}
+form label {
+    white-space: nowrap;
+}
+form input[type="number"] {
+    width: 72px;
 }
 td {
     width: 20%;

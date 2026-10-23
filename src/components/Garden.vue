@@ -77,7 +77,7 @@ export default {
             return {
                 x: crop.pos.x,
                 y: crop.pos.y,
-                radius: crop.image.width / 2,
+                radius: crop.spacingRadius,
                 fill: 'red',
                 opacity: 0.2,
                 stroke: crop === this.selectedCrop ? 'blue' : undefined,
@@ -250,7 +250,7 @@ export default {
                 if (existingCrop === ignoredCrop) continue
 
                 let difference = existingCrop.pos.sub(crop.pos)
-                let minDistance = (existingCrop.image.width + crop.image.width) / 2
+                let minDistance = existingCrop.spacingRadius + crop.spacingRadius
                 if (difference.magnitudeSquared() < minDistance * minDistance) {
                     return true
                 }
