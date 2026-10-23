@@ -11,8 +11,10 @@ import { Crop } from '@/assets/Crop';
 import { Vector } from '@/assets/Vector';
 import { getGardenState } from '@/composables/GardenManager';
 import { journal } from '@/composables/JournalManager';
+import { getVisualSettings } from '@/composables/VisualSettings';
 import { watch } from 'vue';
 const { addCrop, getCrops, clearCrops, addPoint, getPoints, clearPoints } = getGardenState()
+const { getVisualSettingsData, updateVisualSettings } = getVisualSettings()
 
 export default {
     data() {
@@ -30,7 +32,8 @@ export default {
             const saveData = {
                 journal: journalData,
                 crops: simplifiedCropsData,
-                points: pointsData
+                points: pointsData,
+                settings: getVisualSettingsData()
             }
             let text = JSON.stringify(saveData)
 
@@ -47,11 +50,13 @@ export default {
             if (this.file == '' || this.file == null) return
             const reader = new FileReader()
             const updateOthers = this.updateOthers
+            const updateSettings = updateVisualSettings
             reader.onload = function(e) {
                 const saveData = JSON.parse(e.target.result)
                 localStorage.setItem('journal', JSON.stringify(saveData.journal))
                 localStorage.setItem('crops', JSON.stringify(saveData.crops))
                 localStorage.setItem('points', JSON.stringify(saveData.points))
+                if (saveData.settings) updateSettings(saveData.settings)
                 
                 updateOthers()
             }
