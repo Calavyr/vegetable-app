@@ -21,8 +21,8 @@
             <v-rect v-if="gestureMode && selectionShape === 'box' && gestureMoved" :config="getGestureBoxConfig()"></v-rect>
             <v-line v-if="gestureMode && selectionShape === 'lasso' && gestureMoved" :config="getGestureLassoConfig()"></v-line>
         </v-layer>
-        <v-layer :config="{ listening: false }">
-            <v-text :config="{ x: 16, y: 16, text: Math.round(cameraConfig.scaleX * 100) + '%  -  Scroll to zoom  -  Middle-mouse-drag to pan (scroll-wheel)', fontSize: 14, fill: '#222222' }"></v-text>
+        <v-layer>
+            <v-text :config="{ x: 16, y: 16, text: Math.round(cameraConfig.scaleX * 100) + '%  -  Scroll to zoom  -  Middle-mouse-drag to pan (scroll-wheel)', fontSize: 14, fill: '#222222', listening: false }"></v-text>
             <v-text :config="getScaleLabelConfig()"></v-text>
             <v-line :config="getScaleLineConfig()"></v-line>
         </v-layer>
@@ -90,7 +90,10 @@ export default {
             groupStartPositions: [],
             isPanning: false,
             panStart: null,
-            panOrigin: null
+            panOrigin: null,
+            isDraggingScale: false,
+            scaleDragStart: null,
+            scaleOffset: { x: 0, y: 0 }
         }
     },
     methods: {
@@ -141,22 +144,24 @@ export default {
             let distance = this.getScaleDistance()
             let label = distance >= 100 ? `${distance / 100} m` : `${distance} cm`
             return {
-                x: 20,
-                y: this.konvaConfig.height - 54,
+                x: 20 + this.scaleOffset.x,
+                y: this.konvaConfig.height - 54 + this.scaleOffset.y,
                 text: `Estimated scale · ${label}`,
                 fontSize: 14,
-                fill: '#222222'
+                fill: '#222222',
+                name: 'scale-ruler'
             }
         },
         getScaleLineConfig() {
             let distance = this.getScaleDistance()
             let width = distance * this.getPixelScale() * this.cameraConfig.scaleX
-            let x = 20
-            let y = this.konvaConfig.height - 28
+            let x = 20 + this.scaleOffset.x
+            let y = this.konvaConfig.height - 28 + this.scaleOffset.y
             return {
                 points: [x, y - 5, x, y, x + width, y, x + width, y - 5],
                 stroke: '#222222',
-                strokeWidth: 2
+                strokeWidth: 2,
+                name: 'scale-ruler'
             }
         },
         handleWheel(e) {
@@ -276,6 +281,10 @@ export default {
             }
         },
         handleMouseMove(e) {
+            if (this.isDraggingScale) {
+                this.scaleOffset = new Vector(e.evt.clientX, e.evt.clientY).sub(this.scaleDragStart)
+                return
+            }
             if (this.isPanning) {
                 this.cameraConfig.x = this.panOrigin.x + e.evt.clientX - this.panStart.x
                 this.cameraConfig.y = this.panOrigin.y + e.evt.clientY - this.panStart.y
@@ -320,6 +329,12 @@ export default {
             }
         },
         handleMouseDown(e) {
+            if (e.target.name && e.target.name() === 'scale-ruler' && e.evt.button == 0) {
+                this.isDraggingScale = true
+                this.scaleDragStart = new Vector(e.evt.clientX, e.evt.clientY)
+                isMouseDown = true
+                return
+            }
             if (e.evt.button == 1) {
                 e.evt.preventDefault()
                 this.isPanning = true
@@ -389,6 +404,13 @@ export default {
             }
         },
         handleMouseUp(e) {
+            if (this.isDraggingScale) {
+                this.isDraggingScale = false
+                this.scaleDragStart = null
+                this.scaleOffset = { x: 0, y: 0 }
+                isMouseDown = false
+                return
+            }
             if (this.isPanning) {
                 this.isPanning = false
                 isMouseDown = false
