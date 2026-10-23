@@ -8,7 +8,12 @@
         <v-layer>
             <v-line :config='borderConfig'></v-line>
             <v-image v-for="crop in crops" :key="crop" :config="{x: crop.pos.x - crop.image.width / 2, y: crop.pos.y - crop.image.height / 2, image: crop.image}"></v-image>
-            <v-circle v-for="crop in crops" :key="crop.id + crop.pos.x + crop.pos.y" :config="getCropCircleConfig(crop)"></v-circle>
+            <template v-if="showCropHitboxes">
+                <v-circle v-for="crop in crops" :key="crop.id + crop.pos.x + crop.pos.y" :config="getCropCircleConfig(crop)"></v-circle>
+            </template>
+            <template v-if="showBoundaryPoints">
+                <v-circle v-for="(point, index) in boundaryPoints" :key="'boundary-point-' + index" :config="getBoundaryPointConfig(point)"></v-circle>
+            </template>
         </v-layer>
     </v-stage>
 </template>
@@ -20,12 +25,15 @@ import { Vector } from '@/assets/Vector';
 import { getGardenState } from '@/composables/GardenManager';
 import { getPlantState } from '@/composables/PlantManager';
 import { markRaw } from 'vue';
+import { getVisualSettings } from '@/composables/VisualSettings';
 const { currentPlant, selectPlant } = getPlantState()
-const { addCrop, removeCrop, getCrops, addPoint, removePoint, getPoints } = getGardenState()
+const { addCrop, removeCrop, getCrops, addPoint, insertPoint, removePoint, getPoints } = getGardenState()
+const { showCropHitboxes, showBoundaryPoints } = getVisualSettings()
 
 let isMouseDown = false
 let drawingBorder = false
 let draggingCrop = false
+let draggingBorderPoint = null
 
 export default {
     components: {
@@ -50,7 +58,10 @@ export default {
                 fill: '#32a852'
             },
             crops: getCrops(),
-            selectedCrop: null
+            selectedCrop: null,
+            boundaryPoints: getPoints(),
+            showCropHitboxes,
+            showBoundaryPoints
         }
     },
     methods: {
@@ -73,6 +84,16 @@ export default {
                 strokeWidth: crop === this.selectedCrop ? 3 : 0
             }
         },
+        getBoundaryPointConfig(point) {
+            return {
+                x: point.x,
+                y: point.y,
+                radius: 6,
+                fill: 'red',
+                stroke: '#ffffff',
+                strokeWidth: 2
+            }
+        },
         handleMouseMove(e) {
             if (isMouseDown) {
                 if (!drawingBorder && getPoints().value.length == 0) {
@@ -80,6 +101,9 @@ export default {
                 }
                 if (drawingBorder) {
                    this.addBorderPoint(e)
+                } else if (draggingBorderPoint !== null) {
+                    getPoints().value[draggingBorderPoint] = new Vector(e.evt.clientX, e.evt.clientY)
+                    this.borderConfig.points = this.gardenBorder.getPoints()
                 } else if (draggingCrop && this.selectedCrop) {
                     let newPos = new Vector(e.evt.clientX, e.evt.clientY)
                     let oldPos = this.selectedCrop.pos
@@ -100,6 +124,32 @@ export default {
             }
 
             let point = new Vector(e.evt.clientX, e.evt.clientY)
+            let points = getPoints().value
+            let closestBorderPoint = this.getClosestBorderPoint(point)
+
+            if (e.evt.button == 2 && closestBorderPoint !== null) {
+                if (points.length > 3) {
+                    removePoint(points[closestBorderPoint])
+                    this.borderConfig.points = this.gardenBorder.getPoints()
+                }
+                return
+            }
+
+            if (e.evt.button == 0 && closestBorderPoint !== null) {
+                draggingBorderPoint = closestBorderPoint
+                return
+            }
+
+            if (e.evt.button == 0) {
+                let closestEdge = this.getClosestBorderEdge(point)
+                if (closestEdge !== null) {
+                    insertPoint(closestEdge.index + 1, closestEdge.point)
+                    draggingBorderPoint = closestEdge.index + 1
+                    this.borderConfig.points = this.gardenBorder.getPoints()
+                    return
+                }
+            }
+
             let closestCrop = this.getClosestCrop(point)
             let cropRadius = closestCrop ? closestCrop.image.width / 2 : 0
             let difference = closestCrop ? closestCrop.pos.sub(point) : null
@@ -141,6 +191,7 @@ export default {
         handleMouseUp(e) {
             isMouseDown = false
             draggingCrop = false
+            draggingBorderPoint = null
             if (drawingBorder && getPoints().value.length != 0) {
                 drawingBorder = false
                 this.borderConfig.points = this.gardenBorder.getPoints()
@@ -159,6 +210,40 @@ export default {
                 }
             }
             return closestCrop
+        },
+        getClosestBorderPoint(point) {
+            let points = getPoints().value
+            let closestIndex = null
+            let minDistSquared = 12 ** 2
+
+            for (let i = 0; i < points.length; i++) {
+                let difference = points[i].sub(point)
+                let distanceSquared = difference.magnitudeSquared()
+                if (distanceSquared <= minDistSquared) {
+                    closestIndex = i
+                    minDistSquared = distanceSquared
+                }
+            }
+            return closestIndex
+        },
+        getClosestBorderEdge(point) {
+            let points = getPoints().value
+            let closestEdge = null
+            let minDistSquared = 10 ** 2
+
+            for (let i = 0; i < points.length; i++) {
+                let edgePoint1 = points[i]
+                let edgePoint2 = points[(i + 1) % points.length]
+                if (edgePoint1.sub(edgePoint2).magnitudeSquared() == 0) continue
+
+                let closestPoint = this.gardenBorder.getClosestPointOnEdge(point, edgePoint1, edgePoint2)
+                let distanceSquared = closestPoint.sub(point).magnitudeSquared()
+                if (distanceSquared <= minDistSquared) {
+                    closestEdge = { index: i, point: closestPoint }
+                    minDistSquared = distanceSquared
+                }
+            }
+            return closestEdge
         },
         hasCropOverlap(crop, ignoredCrop = null) {
             for (let existingCrop of this.crops) {

@@ -1,11 +1,26 @@
 <template>
     <div>
-        
+        <label>
+            <input type="checkbox" v-model="showCropHitboxes">
+            Show crop hitboxes
+        </label>
+        <label>
+            <input type="checkbox" v-model="showBoundaryPoints">
+            Show garden boundary points
+        </label>
     </div>
 </template>
 
 <script>
+import { getVisualSettings } from '@/composables/VisualSettings';
 
+const { showCropHitboxes, showBoundaryPoints } = getVisualSettings()
+
+export default {
+    setup() {
+        return { showCropHitboxes, showBoundaryPoints }
+    }
+}
 </script>
 
 <style scoped>

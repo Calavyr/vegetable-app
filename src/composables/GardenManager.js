@@ -1,4 +1,5 @@
 import { ref } from "vue";
+import { Vector } from "../assets/Vector";
 const crops = ref([])
 const points = ref([])
 
@@ -21,7 +22,16 @@ export function getGardenState() {
         crops.value = []
     }
     function addPoint(point) {
+        if (!(point instanceof Vector)) {
+            point = new Vector(point.x, point.y)
+        }
         points.value.push(point)
+    }
+    function insertPoint(index, point) {
+        if (!(point instanceof Vector)) {
+            point = new Vector(point.x, point.y)
+        }
+        points.value.splice(index, 0, point)
     }
     function removePoint(point) {
         let index = points.value.indexOf(point)
@@ -38,5 +48,5 @@ export function getGardenState() {
         points.value = []
     }
 
-    return { addCrop, removeCrop, getCrops, clearCrops, addPoint, removePoint, getPoints, clearPoints }
+    return { addCrop, removeCrop, getCrops, clearCrops, addPoint, insertPoint, removePoint, getPoints, clearPoints }
 }
