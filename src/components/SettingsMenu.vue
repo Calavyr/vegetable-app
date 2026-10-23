@@ -15,17 +15,21 @@
                 <option value="lasso">Lasso</option>
             </select>
         </label>
+        <label>
+            Pixels per centimetre
+            <input v-model.number="pixelsPerCentimeter" type="number" min="0.1" max="10" step="0.1">
+        </label>
     </div>
 </template>
 
 <script>
 import { getVisualSettings } from '@/composables/VisualSettings';
 
-const { showCropHitboxes, showBoundaryPoints, selectionShape } = getVisualSettings()
+const { showCropHitboxes, showBoundaryPoints, selectionShape, pixelsPerCentimeter } = getVisualSettings()
 
 export default {
     setup() {
-        return { showCropHitboxes, showBoundaryPoints, selectionShape }
+        return { showCropHitboxes, showBoundaryPoints, selectionShape, pixelsPerCentimeter }
     }
 }
 </script>

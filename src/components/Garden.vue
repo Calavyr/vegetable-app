@@ -9,7 +9,7 @@
         <v-layer :config="cameraConfig">
             <v-line :config='borderConfig'></v-line>
             <v-text v-if="layoutConfig" :config="{x: 16, y: 16, text: 'Draw on the garden, then reopen Plant to apply or cancel the preview.', fontSize: 16, fill: '#111111', listening: false}"></v-text>
-            <v-image v-for="crop in crops" :key="crop" :config="{x: crop.pos.x - crop.image.width / 2, y: crop.pos.y - crop.image.height / 2, image: crop.image}"></v-image>
+            <v-image v-for="crop in crops" :key="crop" :config="getCropImageConfig(crop)"></v-image>
             <template v-if="showCropHitboxes">
                 <v-circle v-for="crop in crops" :key="crop.id + crop.pos.x + crop.pos.y" :config="getCropCircleConfig(crop)"></v-circle>
             </template>
@@ -39,7 +39,7 @@ import { markRaw } from 'vue';
 import { getVisualSettings } from '@/composables/VisualSettings';
 const { currentPlant, selectPlant } = getPlantState()
 const { addCrop, removeCrop, getCrops, addPoint, insertPoint, removePoint, getPoints } = getGardenState()
-const { showCropHitboxes, showBoundaryPoints, selectionShape } = getVisualSettings()
+const { showCropHitboxes, showBoundaryPoints, selectionShape, pixelsPerCentimeter } = getVisualSettings()
 
 let isMouseDown = false
 let drawingBorder = false
@@ -75,6 +75,7 @@ export default {
             showCropHitboxes,
             showBoundaryPoints,
             selectionShape,
+            pixelsPerCentimeter,
             layoutPreview: [],
             layoutConfig: null,
             layoutStart: null,
@@ -127,8 +128,11 @@ export default {
                 (e.evt.clientY - this.cameraConfig.y) / this.cameraConfig.scaleY
             )
         },
+        getPixelScale() {
+            return Math.max(0.1, Math.min(10, Number(this.pixelsPerCentimeter) || 1))
+        },
         getScaleDistance() {
-            let targetDistance = 100 / this.cameraConfig.scaleX
+            let targetDistance = 100 / (this.cameraConfig.scaleX * this.getPixelScale())
             let power = Math.pow(10, Math.floor(Math.log10(targetDistance)))
             let candidates = [1, 2, 5, 10].map((value) => value * power)
             return candidates.reduce((closest, value) => Math.abs(value - targetDistance) < Math.abs(closest - targetDistance) ? value : closest)
@@ -146,7 +150,7 @@ export default {
         },
         getScaleLineConfig() {
             let distance = this.getScaleDistance()
-            let width = distance * this.cameraConfig.scaleX
+            let width = distance * this.getPixelScale() * this.cameraConfig.scaleX
             let x = 20
             let y = this.konvaConfig.height - 28
             return {
@@ -177,7 +181,7 @@ export default {
             ]
             if (!corners.every((corner) => this.gardenBorder.isPointInPolygon(corner))) return false
             for (let crop of this.crops) {
-                if (crop.pos.sub(point).magnitudeSquared() < (crop.spacingRadius + radius) ** 2) return false
+                if (crop.pos.sub(point).magnitudeSquared() < (crop.spacingRadius * this.getPixelScale() + radius) ** 2) return false
             }
             for (let placedPoint of previewPoints) {
                 if (placedPoint.sub(point).magnitudeSquared() < (radius * 2) ** 2) return false
@@ -189,8 +193,9 @@ export default {
             let config = this.layoutConfig
             let spacing = Math.max(Number(config.spacing) || 1, 1)
             let plant = getPlantState().getPlants().value.find((item) => item.id === config.plantId)
-            let radius = plant?.spacingRadius ?? plant?.minArea / 2 ?? spacing / 2
-            spacing = Math.max(spacing, radius * 2)
+            let pixelScale = this.getPixelScale()
+            let radius = (plant?.spacingRadius ?? plant?.minArea / 2 ?? spacing / 2) * pixelScale
+            spacing *= pixelScale
             let candidates = []
             if (config.type === 'row') {
                 let direction = this.layoutEnd.sub(this.layoutStart)
@@ -199,7 +204,7 @@ export default {
                 let unit = direction.mulScalar(1 / length)
                 let normal = new Vector(-unit.y, unit.x)
                 let rowCount = Math.max(1, Math.min(20, Number(config.rows) || 1))
-                let rowGap = Math.max(Number(config.rowGap) || spacing, radius * 2)
+                let rowGap = Math.max((Number(config.rowGap) || Number(config.spacing) || 1) * pixelScale, radius * 2)
                 for (let row = 0; row < rowCount; row++) {
                     for (let distance = 0; distance <= length; distance += spacing) {
                         let candidate = this.layoutStart.add(unit.mulScalar(distance)).add(normal.mulScalar(row * rowGap))
@@ -233,17 +238,27 @@ export default {
             return {
                 x: crop.pos.x,
                 y: crop.pos.y,
-                radius: crop.spacingRadius,
+                radius: crop.spacingRadius * this.getPixelScale(),
                 fill: 'red',
                 opacity: 0.2,
                 listening: false
+            }
+        },
+        getCropImageConfig(crop) {
+            let size = crop.minArea * this.getPixelScale()
+            return {
+                x: crop.pos.x - size / 2,
+                y: crop.pos.y - size / 2,
+                width: size,
+                height: size,
+                image: crop.image
             }
         },
         getSelectionCircleConfig(crop) {
             return {
                 x: crop.pos.x,
                 y: crop.pos.y,
-                radius: crop.spacingRadius + 4,
+                radius: crop.spacingRadius * this.getPixelScale() + 4,
                 fill: 'transparent',
                 stroke: 'blue',
                 strokeWidth: 3,
@@ -352,7 +367,7 @@ export default {
             }
 
             let closestCrop = this.getClosestCrop(point)
-            let cropRadius = closestCrop ? closestCrop.image.width / 2 : 0
+            let cropRadius = closestCrop ? Math.max(closestCrop.minArea * this.getPixelScale() / 2, closestCrop.spacingRadius * this.getPixelScale()) : 0
             let difference = closestCrop ? closestCrop.pos.sub(point) : null
             let cropIsSelected = closestCrop && difference.magnitudeSquared() <= cropRadius * cropRadius
 
@@ -408,7 +423,7 @@ export default {
                     this.selectedCrop = this.selectedCrops[0] || null
                 } else if (currentPlant.value?.id) {
                     let crop = new Crop(currentPlant.value.id, this.gestureStart)
-                    if (this.gardenBorder.isCropInPolygon(crop) && !this.hasCropOverlap(crop)) addCrop(crop)
+                    if (this.isCropPositionInside(crop, crop.pos) && !this.hasCropOverlap(crop)) addCrop(crop)
                 } else {
                     this.selectedCrops = []
                     this.selectedCrop = null
@@ -461,10 +476,21 @@ export default {
         getCropAtPoint(point) {
             let crop = this.getClosestCrop(point)
             if (!crop) return null
-            return crop.pos.sub(point).magnitudeSquared() <= (crop.image.width / 2) ** 2 ? crop : null
+            let radius = Math.max(crop.spacingRadius * this.getPixelScale(), crop.minArea * this.getPixelScale() / 2)
+            return crop.pos.sub(point).magnitudeSquared() <= radius ** 2 ? crop : null
+        },
+        isCropPositionInside(crop, position) {
+            let radius = crop.spacingRadius * this.getPixelScale()
+            let corners = [
+                new Vector(position.x - radius, position.y - radius),
+                new Vector(position.x + radius, position.y - radius),
+                new Vector(position.x + radius, position.y + radius),
+                new Vector(position.x - radius, position.y + radius)
+            ]
+            return corners.every((corner) => this.gardenBorder.isPointInPolygon(corner))
         },
         isCropPositionValid(crop, position, selectedCrops) {
-            let radius = crop.spacingRadius
+            let radius = crop.spacingRadius * this.getPixelScale()
             let corners = [
                 new Vector(position.x - radius, position.y - radius),
                 new Vector(position.x + radius, position.y - radius),
@@ -474,7 +500,7 @@ export default {
             if (!corners.every((corner) => this.gardenBorder.isPointInPolygon(corner))) return false
             for (let other of this.crops) {
                 if (selectedCrops.includes(other)) continue
-                if (other.pos.sub(position).magnitudeSquared() < (other.spacingRadius + radius) ** 2) return false
+                if (other.pos.sub(position).magnitudeSquared() < ((other.spacingRadius + crop.spacingRadius) * this.getPixelScale()) ** 2) return false
             }
             return true
         },
@@ -531,7 +557,7 @@ export default {
                 if (existingCrop === ignoredCrop) continue
 
                 let difference = existingCrop.pos.sub(crop.pos)
-                let minDistance = existingCrop.spacingRadius + crop.spacingRadius
+                let minDistance = (existingCrop.spacingRadius + crop.spacingRadius) * this.getPixelScale()
                 if (difference.magnitudeSquared() < minDistance * minDistance) {
                     return true
                 }
