@@ -19,6 +19,7 @@
             <span>Pixels per centimetre</span>
             <input v-model.number="pixelsPerCentimeter" type="number" min="0.1" max="10" step="0.1">
         </label>
+        <button class="resetButton" @click="resetAllData">Reset all data</button>
     </div>
 </template>
 
@@ -30,6 +31,16 @@ const { showCropHitboxes, showBoundaryPoints, selectionShape, pixelsPerCentimete
 export default {
     setup() {
         return { showCropHitboxes, showBoundaryPoints, selectionShape, pixelsPerCentimeter }
+    },
+    methods: {
+        resetAllData() {
+            if (!window.confirm('This will permanently delete your saved garden, journal, custom crops, tags, and settings. Continue?')) return
+
+            for (let key of ['journal', 'crops', 'points', 'custom-plants', 'journal-tags', 'visualSettings']) {
+                localStorage.removeItem(key)
+            }
+            window.location.reload()
+        }
     }
 }
 </script>
@@ -57,5 +68,9 @@ export default {
 }
 .scaleRow input {
     width: 80px;
+}
+.resetButton {
+    margin: 6px;
+    padding: 6px;
 }
 </style>

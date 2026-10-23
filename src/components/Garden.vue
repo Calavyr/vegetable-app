@@ -536,7 +536,14 @@ export default {
         getGestureBoxConfig() {
             let x = Math.min(this.gestureStart.x, this.gestureEnd.x)
             let y = Math.min(this.gestureStart.y, this.gestureEnd.y)
-            return { x, y, width: Math.abs(this.gestureEnd.x - this.gestureStart.x), height: Math.abs(this.gestureEnd.y - this.gestureStart.y), stroke: this.gestureMode === 'delete' ? 'red' : 'blue', strokeWidth: 2, fill: this.gestureMode === 'delete' ? 'rgba(255,0,0,0.12)' : 'rgba(0,0,255,0.12)', listening: false }
+            return { 
+                x, y, 
+                width: Math.abs(this.gestureEnd.x - this.gestureStart.x), 
+                height: Math.abs(this.gestureEnd.y - this.gestureStart.y), 
+                stroke: this.gestureMode === 'delete' ? 'red' : 'blue', strokeWidth: 2, 
+                fill: this.gestureMode === 'delete' ? 'rgba(255,0,0,0.12)' : 'rgba(0,0,255,0.12)', 
+                listening: false
+            }
         },
         getGestureLassoConfig() {
             let points = this.gesturePoints.flatMap((point) => [point.x, point.y])
@@ -546,12 +553,16 @@ export default {
         },
         isCropInGesture(point) {
             if (this.selectionShape === 'box') {
-                return point.x >= Math.min(this.gestureStart.x, this.gestureEnd.x) && point.x <= Math.max(this.gestureStart.x, this.gestureEnd.x) && point.y >= Math.min(this.gestureStart.y, this.gestureEnd.y) && point.y <= Math.max(this.gestureStart.y, this.gestureEnd.y)
+                return point.x >= Math.min(this.gestureStart.x, this.gestureEnd.x) && 
+                point.x <= Math.max(this.gestureStart.x, this.gestureEnd.x) && 
+                point.y >= Math.min(this.gestureStart.y, this.gestureEnd.y) && 
+                point.y <= Math.max(this.gestureStart.y, this.gestureEnd.y)
             }
             let inside = false
             let points = this.gesturePoints
             for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-                if ((points[i].y > point.y) !== (points[j].y > point.y) && point.x < (points[j].x - points[i].x) * (point.y - points[i].y) / (points[j].y - points[i].y) + points[i].x) inside = !inside
+                if ((points[i].y > point.y) !== (points[j].y > point.y) && point.x < (points[j].x - points[i].x) * (point.y - points[i].y) / (points[j].y - points[i].y) + points[i].x) 
+                    inside = !inside
             }
             return inside
         },
