@@ -12,10 +12,13 @@
             <template v-if="showCropHitboxes">
                 <v-circle v-for="crop in crops" :key="crop.id + crop.pos.x + crop.pos.y" :config="getCropCircleConfig(crop)"></v-circle>
             </template>
+            <v-circle v-for="crop in selectedCrops" :key="'selected-' + crop.id + crop.pos.x + crop.pos.y" :config="getSelectionCircleConfig(crop)"></v-circle>
             <template v-if="showBoundaryPoints">
                 <v-circle v-for="(point, index) in boundaryPoints" :key="'boundary-point-' + index" :config="getBoundaryPointConfig(point)"></v-circle>
             </template>
             <v-circle v-for="(point, index) in layoutPreview" :key="'layout-preview-' + index" :config="getLayoutPreviewConfig(point)"></v-circle>
+            <v-rect v-if="gestureMode && selectionShape === 'box' && gestureMoved" :config="getGestureBoxConfig()"></v-rect>
+            <v-line v-if="gestureMode && selectionShape === 'lasso' && gestureMoved" :config="getGestureLassoConfig()"></v-line>
         </v-layer>
     </v-stage>
 </template>
@@ -30,7 +33,7 @@ import { markRaw } from 'vue';
 import { getVisualSettings } from '@/composables/VisualSettings';
 const { currentPlant, selectPlant } = getPlantState()
 const { addCrop, removeCrop, getCrops, addPoint, insertPoint, removePoint, getPoints } = getGardenState()
-const { showCropHitboxes, showBoundaryPoints } = getVisualSettings()
+const { showCropHitboxes, showBoundaryPoints, selectionShape } = getVisualSettings()
 
 let isMouseDown = false
 let drawingBorder = false
@@ -64,10 +67,19 @@ export default {
             boundaryPoints: getPoints(),
             showCropHitboxes,
             showBoundaryPoints,
+            selectionShape,
             layoutPreview: [],
             layoutConfig: null,
             layoutStart: null,
-            layoutEnd: null
+            layoutEnd: null,
+            selectedCrops: [],
+            gestureMode: null,
+            gestureStart: null,
+            gestureEnd: null,
+            gesturePoints: [],
+            gestureMoved: false,
+            groupDragStart: null,
+            groupStartPositions: []
         }
     },
     methods: {
@@ -167,8 +179,18 @@ export default {
                 radius: crop.spacingRadius,
                 fill: 'red',
                 opacity: 0.2,
-                stroke: crop === this.selectedCrop ? 'blue' : undefined,
-                strokeWidth: crop === this.selectedCrop ? 3 : 0
+                listening: false
+            }
+        },
+        getSelectionCircleConfig(crop) {
+            return {
+                x: crop.pos.x,
+                y: crop.pos.y,
+                radius: crop.spacingRadius + 4,
+                fill: 'transparent',
+                stroke: 'blue',
+                strokeWidth: 3,
+                listening: false
             }
         },
         getBoundaryPointConfig(point) {
@@ -188,6 +210,15 @@ export default {
                     this.updateLayoutPreview()
                     return
                 }
+                if (this.gestureMode) {
+                    this.gestureEnd = new Vector(e.evt.clientX, e.evt.clientY)
+                    if (this.gestureStart.sub(this.gestureEnd).magnitudeSquared() > 36) this.gestureMoved = true
+                    if (this.selectionShape === 'lasso') {
+                        let lastPoint = this.gesturePoints[this.gesturePoints.length - 1]
+                        if (lastPoint.sub(this.gestureEnd).magnitudeSquared() >= 25) this.gesturePoints.push(this.gestureEnd)
+                    }
+                    return
+                }
                 if (!drawingBorder && getPoints().value.length == 0) {
                     drawingBorder = true
                 }
@@ -197,11 +228,12 @@ export default {
                     getPoints().value[draggingBorderPoint] = new Vector(e.evt.clientX, e.evt.clientY)
                     this.borderConfig.points = this.gardenBorder.getPoints()
                 } else if (draggingCrop && this.selectedCrop) {
-                    let newPos = new Vector(e.evt.clientX, e.evt.clientY)
-                    let oldPos = this.selectedCrop.pos
-                    this.selectedCrop.pos = newPos
-                    if (!this.gardenBorder.isCropInPolygon(this.selectedCrop) || this.hasCropOverlap(this.selectedCrop, this.selectedCrop)) {
-                        this.selectedCrop.pos = oldPos
+                    let delta = new Vector(e.evt.clientX, e.evt.clientY).sub(this.groupDragStart)
+                    let selected = this.selectedCrops
+                    let proposed = this.groupStartPositions.map((position) => position.add(delta))
+                    let valid = selected.every((crop, index) => this.isCropPositionValid(crop, proposed[index], selected))
+                    if (valid) {
+                        selected.forEach((crop, index) => { crop.pos = proposed[index] })
                     }
                 }
             } else {
@@ -254,36 +286,20 @@ export default {
             let cropIsSelected = closestCrop && difference.magnitudeSquared() <= cropRadius * cropRadius
 
             if (e.evt.button == 2) { // Right click
-                if (cropIsSelected) {
-                    removeCrop(closestCrop)
-                    if (this.selectedCrop === closestCrop) this.selectedCrop = null
-                }
+                this.beginSelectionGesture('delete', point)
                 return
             }
 
             if (e.evt.button == 0) { // Left click
                 if (cropIsSelected) {
+                    if (!this.selectedCrops.includes(closestCrop)) this.selectedCrops = [closestCrop]
                     this.selectedCrop = closestCrop
                     draggingCrop = true
+                    this.groupDragStart = point
+                    this.groupStartPositions = this.selectedCrops.map((crop) => crop.pos)
                     return
                 }
-
-                let x = e.evt.clientX
-                let y = e.evt.clientY
-                if (!currentPlant.value.id) return
-
-                let posVector = new Vector(x, y)
-                let newCrop = new Crop(currentPlant.value.id, posVector)
-
-                if (!this.gardenBorder.isCropInPolygon(newCrop)) {
-                    return
-                }
-
-                if (this.hasCropOverlap(newCrop)) {
-                    return
-                }
-
-                addCrop(newCrop)
+                this.beginSelectionGesture('select', point)
             }
         },
         handleMouseUp(e) {
@@ -295,6 +311,40 @@ export default {
                 isMouseDown = false
                 return
             }
+            if (this.gestureMode) {
+                let endPoint = new Vector(e.evt.clientX, e.evt.clientY)
+                this.gestureEnd = endPoint
+                if (this.gestureMoved) {
+                    if (this.selectionShape === 'lasso') this.gesturePoints.push(endPoint)
+                    let matches = this.crops.filter((crop) => this.isCropInGesture(crop.pos))
+                    if (this.gestureMode === 'delete') {
+                        matches.forEach((crop) => removeCrop(crop))
+                        this.selectedCrops = this.selectedCrops.filter((crop) => !matches.includes(crop))
+                        this.selectedCrop = this.selectedCrops[0] || null
+                    } else {
+                        this.selectedCrops = matches
+                        this.selectedCrop = matches[0] || null
+                    }
+                } else if (this.gestureMode === 'delete') {
+                    let crop = this.getCropAtPoint(this.gestureStart)
+                    if (crop) removeCrop(crop)
+                    this.selectedCrops = this.selectedCrops.filter((item) => item !== crop)
+                    this.selectedCrop = this.selectedCrops[0] || null
+                } else if (currentPlant.value?.id) {
+                    let crop = new Crop(currentPlant.value.id, this.gestureStart)
+                    if (this.gardenBorder.isCropInPolygon(crop) && !this.hasCropOverlap(crop)) addCrop(crop)
+                } else {
+                    this.selectedCrops = []
+                    this.selectedCrop = null
+                }
+                this.gestureMode = null
+                this.gestureStart = null
+                this.gestureEnd = null
+                this.gesturePoints = []
+                this.gestureMoved = false
+                isMouseDown = false
+                return
+            }
             isMouseDown = false
             draggingCrop = false
             draggingBorderPoint = null
@@ -302,6 +352,55 @@ export default {
                 drawingBorder = false
                 this.borderConfig.points = this.gardenBorder.getPoints()
             }
+        },
+        beginSelectionGesture(mode, point) {
+            this.gestureMode = mode
+            this.gestureStart = point
+            this.gestureEnd = point
+            this.gesturePoints = [point]
+            this.gestureMoved = false
+        },
+        getGestureBoxConfig() {
+            let x = Math.min(this.gestureStart.x, this.gestureEnd.x)
+            let y = Math.min(this.gestureStart.y, this.gestureEnd.y)
+            return { x, y, width: Math.abs(this.gestureEnd.x - this.gestureStart.x), height: Math.abs(this.gestureEnd.y - this.gestureStart.y), stroke: this.gestureMode === 'delete' ? 'red' : 'blue', strokeWidth: 2, fill: this.gestureMode === 'delete' ? 'rgba(255,0,0,0.12)' : 'rgba(0,0,255,0.12)', listening: false }
+        },
+        getGestureLassoConfig() {
+            let points = this.gesturePoints.flatMap((point) => [point.x, point.y])
+            if (this.gestureEnd) points.push(this.gestureEnd.x, this.gestureEnd.y)
+            let color = this.gestureMode === 'delete' ? 'red' : 'blue'
+            return { points, stroke: color, strokeWidth: 2, closed: this.gestureMoved, fill: this.gestureMode === 'delete' ? 'rgba(255,0,0,0.12)' : 'rgba(0,0,255,0.12)', listening: false }
+        },
+        isCropInGesture(point) {
+            if (this.selectionShape === 'box') {
+                return point.x >= Math.min(this.gestureStart.x, this.gestureEnd.x) && point.x <= Math.max(this.gestureStart.x, this.gestureEnd.x) && point.y >= Math.min(this.gestureStart.y, this.gestureEnd.y) && point.y <= Math.max(this.gestureStart.y, this.gestureEnd.y)
+            }
+            let inside = false
+            let points = this.gesturePoints
+            for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+                if ((points[i].y > point.y) !== (points[j].y > point.y) && point.x < (points[j].x - points[i].x) * (point.y - points[i].y) / (points[j].y - points[i].y) + points[i].x) inside = !inside
+            }
+            return inside
+        },
+        getCropAtPoint(point) {
+            let crop = this.getClosestCrop(point)
+            if (!crop) return null
+            return crop.pos.sub(point).magnitudeSquared() <= (crop.image.width / 2) ** 2 ? crop : null
+        },
+        isCropPositionValid(crop, position, selectedCrops) {
+            let radius = crop.spacingRadius
+            let corners = [
+                new Vector(position.x - radius, position.y - radius),
+                new Vector(position.x + radius, position.y - radius),
+                new Vector(position.x + radius, position.y + radius),
+                new Vector(position.x - radius, position.y + radius)
+            ]
+            if (!corners.every((corner) => this.gardenBorder.isPointInPolygon(corner))) return false
+            for (let other of this.crops) {
+                if (selectedCrops.includes(other)) continue
+                if (other.pos.sub(position).magnitudeSquared() < (other.spacingRadius + radius) ** 2) return false
+            }
+            return true
         },
         getClosestCrop(point) { // For selecting crops with mouse
             let closestCrop = null

@@ -8,17 +8,24 @@
             <input type="checkbox" v-model="showBoundaryPoints">
             Show garden boundary points
         </label>
+        <label>
+            Drag selection shape
+            <select v-model="selectionShape">
+                <option value="box">Box</option>
+                <option value="lasso">Lasso</option>
+            </select>
+        </label>
     </div>
 </template>
 
 <script>
 import { getVisualSettings } from '@/composables/VisualSettings';
 
-const { showCropHitboxes, showBoundaryPoints } = getVisualSettings()
+const { showCropHitboxes, showBoundaryPoints, selectionShape } = getVisualSettings()
 
 export default {
     setup() {
-        return { showCropHitboxes, showBoundaryPoints }
+        return { showCropHitboxes, showBoundaryPoints, selectionShape }
     }
 }
 </script>
