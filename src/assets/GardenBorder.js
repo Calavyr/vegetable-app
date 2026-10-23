@@ -9,9 +9,10 @@ export class GardenBorder {
 
     isPointInPolygon(point) {
         let inside = false
-        for (let i = 0; i < this.points.length; i++) {
-            let currentPoint = this.points[i]
-            let nextPoint = this.points[(i + 1) % this.points.length]
+        let points = this.points.value
+        for (let i = 0; i < points.length; i++) {
+            let currentPoint = points[i]
+            let nextPoint = points[(i + 1) % points.length]
 
             if (currentPoint.y > point.y != nextPoint.y > point.y) {
                 let gradientReciprocal = (nextPoint.x - currentPoint.x)/(nextPoint.y - currentPoint.y)
@@ -54,9 +55,10 @@ export class GardenBorder {
 
     isPointOnEdge(point) {
         let maxDistSquared = 4 ** 2
-        for (let i = 0; i < this.points.length; i++) {
-            let edgePoint1 = this.points[i]
-            let edgePoint2 = this.points[(i + 1) % this.points.length]
+        let points = this.points.value
+        for (let i = 0; i < points.length; i++) {
+            let edgePoint1 = points[i]
+            let edgePoint2 = points[(i + 1) % points.length]
 
             let closestPointOnEdge = this.getClosestPointOnEdge(point, edgePoint1, edgePoint2)
             let squaredDist = closestPointOnEdge.sub(point).magnitudeSquared()
@@ -70,7 +72,7 @@ export class GardenBorder {
 
     getPoints() { // Returns points in vue-konva-friendly 2n array [x1, y1, x2, y2...]
         let flattenedArray = []
-        for (let point of this.points) {
+        for (let point of this.points.value) {
             flattenedArray.push(point.x)
             flattenedArray.push(point.y)
         }

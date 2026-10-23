@@ -32,7 +32,6 @@ export default {
                 crops: simplifiedCropsData,
                 points: pointsData
             }
-
             let text = JSON.stringify(saveData)
 
             const blob = new Blob([text], {type: 'text/plain'})
@@ -43,13 +42,13 @@ export default {
             link.click()
             URL.revokeObjectURL(fileUrl)
         },
-        loadSaveData() { // Load save data into localStorage, then reload app normally from localStorage
+        loadSaveData() {
+            // Load save data into localStorage, then reload app normally from localStorage
             if (this.file == '' || this.file == null) return
             const reader = new FileReader()
             const updateOthers = this.updateOthers
             reader.onload = function(e) {
                 const saveData = JSON.parse(e.target.result)
-                
                 localStorage.setItem('journal', JSON.stringify(saveData.journal))
                 localStorage.setItem('crops', JSON.stringify(saveData.crops))
                 localStorage.setItem('points', JSON.stringify(saveData.points))
@@ -59,6 +58,7 @@ export default {
             reader.readAsText(this.file)
         },
         updateOthers() {
+            // Load from localStorage to webapp then update other features where necessary
             let journalData = localStorage.getItem('journal')
             if (journalData !== null) {
                 let parsedJournalData = JSON.parse(journalData)
@@ -69,13 +69,15 @@ export default {
                 }
             }
 
+            // Clear crops and points then add crops/points from localStorage
             let cropsData = localStorage.getItem('crops')
             clearCrops()
             if (cropsData !== null) {
                 let parsedCropsData = JSON.parse(cropsData)
                 if (cropsData !== '' && parsedCropsData) {
                     for (let cropInfo of parsedCropsData) {
-                        let posVector = new Vector(cropInfo.pos.x, cropInfo.pos.y)
+                        // Convert from object to custom Vector class
+                        let posVector = new Vector(cropInfo.pos.x, cropInfo.pos.y) 
                         let crop = new Crop(cropInfo.id, posVector)
                         addCrop(crop)
                     }

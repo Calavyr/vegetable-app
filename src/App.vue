@@ -41,7 +41,16 @@ export default {
 		updateChildren() {
 			this.$refs.journal.updateDate()
 			this.$refs.garden.updateGarden()
+		},
+		preventContextMenu(e) {
+			e.preventDefault()
 		}
+	},
+	mounted() {
+		window.addEventListener('contextmenu', this.preventContextMenu)
+	},
+	unmounted() {
+		window.removeEventListener('contextmenu', this.preventContextMenu)
 	}
 }
 </script>

@@ -16,5 +16,6 @@ div {
     width: 60%;
     height: 80%;
     border: black 2px solid;
+    background-color: white;
 }
 </style>

@@ -14,18 +14,15 @@ export function getGardenState() {
         crops.value.splice(index, 1)
         return true
     }
-
     function getCrops() {
         return crops
     }
     function clearCrops() {
         crops.value = []
     }
-
     function addPoint(point) {
         points.value.push(point)
     }
-
     function removePoint(point) {
         let index = points.value.indexOf(point)
         if (index == -1) {
@@ -34,7 +31,6 @@ export function getGardenState() {
         points.value.splice(index, 1)
         return true
     }
-
     function getPoints() {
         return points
     }
