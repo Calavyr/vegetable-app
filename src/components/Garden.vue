@@ -7,6 +7,7 @@
     @mouseleave='handleMouseUp'>
         <v-layer>
             <v-line :config='borderConfig'></v-line>
+            <v-text v-if="layoutConfig" :config="{x: 16, y: 16, text: 'Draw on the garden, then reopen Plant to apply or cancel the preview.', fontSize: 16, fill: '#111111', listening: false}"></v-text>
             <v-image v-for="crop in crops" :key="crop" :config="{x: crop.pos.x - crop.image.width / 2, y: crop.pos.y - crop.image.height / 2, image: crop.image}"></v-image>
             <template v-if="showCropHitboxes">
                 <v-circle v-for="crop in crops" :key="crop.id + crop.pos.x + crop.pos.y" :config="getCropCircleConfig(crop)"></v-circle>
@@ -14,6 +15,7 @@
             <template v-if="showBoundaryPoints">
                 <v-circle v-for="(point, index) in boundaryPoints" :key="'boundary-point-' + index" :config="getBoundaryPointConfig(point)"></v-circle>
             </template>
+            <v-circle v-for="(point, index) in layoutPreview" :key="'layout-preview-' + index" :config="getLayoutPreviewConfig(point)"></v-circle>
         </v-layer>
     </v-stage>
 </template>
@@ -61,12 +63,97 @@ export default {
             selectedCrop: null,
             boundaryPoints: getPoints(),
             showCropHitboxes,
-            showBoundaryPoints
+            showBoundaryPoints,
+            layoutPreview: [],
+            layoutConfig: null,
+            layoutStart: null,
+            layoutEnd: null
         }
     },
     methods: {
         updateGarden() {
             this.borderConfig.points = this.gardenBorder.getPoints()
+        },
+        beginLayout(config) {
+            this.layoutConfig = config
+            this.layoutStart = null
+            this.layoutEnd = null
+            this.layoutPreview = []
+        },
+        cancelLayout() {
+            this.layoutConfig = null
+            this.layoutStart = null
+            this.layoutEnd = null
+            this.layoutPreview = []
+        },
+        applyLayout() {
+            if (!this.layoutConfig || this.layoutPreview.length == 0) return 'Draw a layout preview first.'
+            let plant = getPlantState().getPlants().value.find((item) => item.id === this.layoutConfig.plantId)
+            if (!plant) return 'That crop is no longer available.'
+            let positions = [...this.layoutPreview]
+            for (let position of positions) addCrop(new Crop(plant.id, position))
+            let count = positions.length
+            this.cancelLayout()
+            return `Placed ${count} crops.`
+        },
+        getLayoutPreviewConfig(point) {
+            return { x: point.x, y: point.y, radius: 5, fill: '#1687ff', opacity: 0.65, listening: false }
+        },
+        getLayoutPointIsAvailable(point, radius, previewPoints) {
+            let corners = [
+                new Vector(point.x - radius, point.y - radius),
+                new Vector(point.x + radius, point.y - radius),
+                new Vector(point.x + radius, point.y + radius),
+                new Vector(point.x - radius, point.y + radius)
+            ]
+            if (!corners.every((corner) => this.gardenBorder.isPointInPolygon(corner))) return false
+            for (let crop of this.crops) {
+                if (crop.pos.sub(point).magnitudeSquared() < (crop.spacingRadius + radius) ** 2) return false
+            }
+            for (let placedPoint of previewPoints) {
+                if (placedPoint.sub(point).magnitudeSquared() < (radius * 2) ** 2) return false
+            }
+            return true
+        },
+        updateLayoutPreview() {
+            if (!this.layoutConfig || !this.layoutStart || !this.layoutEnd) return
+            let config = this.layoutConfig
+            let spacing = Math.max(Number(config.spacing) || 1, 1)
+            let plant = getPlantState().getPlants().value.find((item) => item.id === config.plantId)
+            let radius = plant?.spacingRadius ?? plant?.minArea / 2 ?? spacing / 2
+            spacing = Math.max(spacing, radius * 2)
+            let candidates = []
+            if (config.type === 'row') {
+                let direction = this.layoutEnd.sub(this.layoutStart)
+                let length = Math.sqrt(direction.magnitudeSquared())
+                if (length < 1) return this.layoutPreview = []
+                let unit = direction.mulScalar(1 / length)
+                let normal = new Vector(-unit.y, unit.x)
+                let rowCount = Math.max(1, Math.min(20, Number(config.rows) || 1))
+                let rowGap = Math.max(Number(config.rowGap) || spacing, radius * 2)
+                for (let row = 0; row < rowCount; row++) {
+                    for (let distance = 0; distance <= length; distance += spacing) {
+                        let candidate = this.layoutStart.add(unit.mulScalar(distance)).add(normal.mulScalar(row * rowGap))
+                        if (this.getLayoutPointIsAvailable(candidate, radius, candidates)) candidates.push(candidate)
+                    }
+                }
+            } else {
+                let minX = Math.min(this.layoutStart.x, this.layoutEnd.x)
+                let maxX = Math.max(this.layoutStart.x, this.layoutEnd.x)
+                let minY = Math.min(this.layoutStart.y, this.layoutEnd.y)
+                let maxY = Math.max(this.layoutStart.y, this.layoutEnd.y)
+                let tight = config.patchPattern === 'tight'
+                let rowSpacing = tight ? spacing * Math.sqrt(3) / 2 : spacing
+                let row = 0
+                for (let y = minY + radius; y <= maxY - radius; y += rowSpacing, row++) {
+                    let offset = tight && row % 2 == 1 ? spacing / 2 : 0
+                    for (let x = minX + radius + offset; x <= maxX - radius; x += spacing) {
+                        let candidate = new Vector(x, y)
+                        if (this.getLayoutPointIsAvailable(candidate, radius, candidates)) candidates.push(candidate)
+                    }
+                }
+            }
+            this.layoutPreview = candidates
         },
         addBorderPoint(e) {
             let newPoint = new Vector(e.evt.clientX, e.evt.clientY)
@@ -96,6 +183,11 @@ export default {
         },
         handleMouseMove(e) {
             if (isMouseDown) {
+                if (this.layoutConfig && this.layoutStart) {
+                    this.layoutEnd = new Vector(e.evt.clientX, e.evt.clientY)
+                    this.updateLayoutPreview()
+                    return
+                }
                 if (!drawingBorder && getPoints().value.length == 0) {
                     drawingBorder = true
                 }
@@ -119,6 +211,12 @@ export default {
         },
         handleMouseDown(e) {
             isMouseDown = true
+            if (this.layoutConfig && getPoints().value.length >= 3 && e.evt.button == 0) {
+                this.layoutStart = new Vector(e.evt.clientX, e.evt.clientY)
+                this.layoutEnd = this.layoutStart
+                this.layoutPreview = []
+                return
+            }
             if (getPoints().value.length == 0 || drawingBorder) {
                 return
             }
@@ -189,6 +287,14 @@ export default {
             }
         },
         handleMouseUp(e) {
+            if (this.layoutConfig && this.layoutStart) {
+                this.layoutEnd = new Vector(e.evt.clientX, e.evt.clientY)
+                this.updateLayoutPreview()
+                this.layoutStart = null
+                this.$emit('layoutPreviewReady', this.layoutPreview.length)
+                isMouseDown = false
+                return
+            }
             isMouseDown = false
             draggingCrop = false
             draggingBorderPoint = null
