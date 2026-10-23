@@ -1,11 +1,15 @@
 <template>
-    <div>
-        <div id="tableWrapper">
+    <div class="plantMenu">
+        <div class="menuContent">
             <div class="plantGrid">
-                <button v-for="plant in plants" :key="plant.id" @click="selectPlant(plant)" :class="{ 'selected': currentPlant === plant }">
-                    <span>{{ plant.plant }}</span>
-                    <img :src="plant.image" width="50">
-                </button>
+                <div v-for="plant in plants" :key="plant.id" class="plantCard">
+                    <button @click="selectPlant(plant)" :class="{ 'selected': currentPlant === plant }">
+                        <span>{{ plant.plant }}</span>
+                        <img :src="plant.image" width="50">
+                        <small>{{ getPlantRadius(plant) }} cm radius</small>
+                    </button>
+                    <button v-if="String(plant.id).startsWith('custom-')" class="removePlant" @click="removePlant(plant)">Remove</button>
+                </div>
             </div>
             <form @submit.prevent="importCrop">
                 <input v-model="customPlantName" placeholder="Crop name" maxlength="40" required>
@@ -22,7 +26,9 @@
 
 <script>
 import { getPlantState } from '@/composables/PlantManager';
-const { currentPlant, selectPlant, addCustomPlant, getPlants } = getPlantState()
+import { getGardenState } from '@/composables/GardenManager';
+const { currentPlant, selectPlant, addCustomPlant, removeCustomPlant, getPlants } = getPlantState()
+const { getCrops } = getGardenState()
 
 export default {
     data() {
@@ -37,6 +43,17 @@ export default {
     },
     methods: {
         selectPlant,
+        getPlantRadius(plant) {
+            return plant.spacingRadius ?? plant.minArea / 2
+        },
+        removePlant(plant) {
+            if (getCrops().value.some((crop) => crop.id === plant.id)) {
+                this.importError = 'Remove this crop from the garden before deleting it.'
+                return
+            }
+            removeCustomPlant(plant.id)
+            this.importError = ''
+        },
         handleImageChange(event) {
             const file = event.target.files[0]
             this.importError = ''
@@ -84,7 +101,10 @@ export default {
 </script>
 
 <style scoped>
-div {
+* {
+    box-sizing: border-box;
+}
+.plantMenu {
     position: absolute;
     top: 10%;
     left: 20%;
@@ -93,28 +113,48 @@ div {
     border: black 2px solid;
     background: white;
 }
-div#tableWrapper {
+.menuContent {
     position: absolute;
-    left: 4%;
-    top: 5%;
-    width: 92%;
-    height: 90%;
-    overflow-x: hidden;
-    overflow-y: auto;
-}
-table {
-    width: 100%;
-    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    left: 1%;
+    top: 4%;
+    width: 98%;
+    height: 92%;
 }
 .plantGrid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    align-content: start;
+    gap: 8px;
 }
 .plantGrid button {
-    min-height: 90px;
+    min-height: 110px;
     border: black 2px solid;
     border-radius: 1vw;
     background: white;
+}
+.plantCard {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+.plantCard > button:first-child {
+    width: 100%;
+    flex: 1;
+}
+.plantCard .removePlant {
+    min-height: 28px;
+    border: 1px solid #8b1c1c;
+    border-radius: 4px;
+    background: #fff;
+    color: #8b1c1c;
 }
 .plantGrid button.selected {
     background: lightgrey;
@@ -126,6 +166,8 @@ table {
 }
 form {
     display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
     gap: 8px;
     align-items: center;
     margin-top: 12px;
@@ -135,16 +177,5 @@ form label {
 }
 form input[type="number"] {
     width: 72px;
-}
-td {
-    width: 20%;
-    border: black 2px solid;
-    border-radius: 1vw;
-    text-align: center;
-    background: white;
-}
-
-td.selected {
-    background: lightgrey;
 }
 </style>

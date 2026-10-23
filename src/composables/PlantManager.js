@@ -25,9 +25,17 @@ export function getPlantState() {
         localStorage.setItem('custom-plants', JSON.stringify(plants.value.filter((item) => String(item.id).startsWith('custom-'))))
     }
 
+    function removeCustomPlant(id) {
+        if (!String(id).startsWith('custom-')) return false
+        plants.value = plants.value.filter((plant) => plant.id !== id)
+        localStorage.setItem('custom-plants', JSON.stringify(plants.value.filter((plant) => String(plant.id).startsWith('custom-'))))
+        if (currentPlant.value?.id === id) currentPlant.value = ''
+        return true
+    }
+
     function getPlants() {
         return plants
     }
 
-    return { currentPlant, selectPlant, addCustomPlant, getPlants }
+    return { currentPlant, selectPlant, addCustomPlant, removeCustomPlant, getPlants }
 }
